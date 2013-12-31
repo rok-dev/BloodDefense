@@ -1,33 +1,34 @@
-/**
- * Created by Rok on 28.12.2013.
- */
-
 (function(window) {
 
-    var stage;
+    const BLOOD_VESSEL_COLOR    = "#FF5C33";
+    const BLOOD_WALL_COLOR      = "#800000";
+    const BLOOD_WALL_THICKNESS  = 8;
 
-    function Environment(stage) {
-        this.stage = stage;
+    var rectanglesArray;
+
+    function Environment() {
+        rectanglesArray = [];
+    }
+
+    Environment.prototype.getRectanglesArray = function() {
+        return rectanglesArray;
     }
 
     /**
-     *
-     * Ich habe dieses Tutorial als Basis verwendet:
+     * This tutorial was used as a basis for this function:
      * http://www.emanueleferonato.com/2011/07/14/create-a-terrain-like-the-one-in-tiny-wings-with-flash-and-box2d/
-     * @param numberOfHills
-     * @param pixelStep
      */
-    function drawHills(numberOfHills, pixelStep) {
+    Environment.prototype.drawHills = function(numberOfHills, pixelStep) {
         var hillStartY = 140 + Math.random() * 200;
         //spawnPointY = hillStartY;
         var hillWidth = canvas.width / numberOfHills;
         var hillSliceWidth = hillWidth / pixelStep;
 
         var upBloodWall = new createjs.Shape();
-        upBloodWall.graphics.beginStroke("#800000").setStrokeStyle(8);
+        upBloodWall.graphics.beginStroke(BLOOD_WALL_COLOR).setStrokeStyle(BLOOD_WALL_THICKNESS);
 
         var downBloodWall = new createjs.Shape();
-        downBloodWall.graphics.beginStroke("#800000").setStrokeStyle(8);
+        downBloodWall.graphics.beginStroke(BLOOD_WALL_COLOR).setStrokeStyle(BLOOD_WALL_THICKNESS);
 
         for (var i = 0; i < numberOfHills; i++) {
             var randomHeight = Math.random() * 100;
@@ -52,9 +53,14 @@
                 downBloodWall.graphics.lineTo(downPoint.x, stage.height);
                 downBloodWall.graphics.moveTo(downPoint.x, downPoint.y);
 
-                var rect = new createjs.Shape();
-                rect.graphics.beginFill("#FF5C33").drawRect(upPoint.x, upPoint.y, pixelStep+1, BLOOD_VESSEL_THICKNESS);
-                stage.addChild(rect);
+                // Draw rect shape which is the background of the blood vessel.
+                var rect = new createjs.Rectangle(upPoint.x, upPoint.y, pixelStep+1, BLOOD_VESSEL_THICKNESS);
+                var rectShape = new createjs.Shape();
+                rectShape.graphics.beginFill(BLOOD_VESSEL_COLOR).drawRect(rect.x, rect.y, rect.width, rect.height);
+                stage.addChild(rectShape);
+
+                // Store the rect for purposes of collision detection.
+                rectanglesArray.push(rect);
 
                 var lower1 = new box2d.b2Vec2(downPoint.x / SCALE, STAGE_HEIGHT / SCALE);
                 var lower2 = new box2d.b2Vec2(downPoint.x / SCALE, downPoint.y / SCALE);
@@ -98,4 +104,30 @@
         var worldSlice = world.CreateBody(sliceBody);
         worldSlice.CreateFixture(sliceFixture);
     }
+
+    function findCentroid(vs, count) {
+        var c = new box2d.b2Vec2();
+        var area=0.0;
+        var p1X=0.0;
+        var p1Y=0.0;
+        var inv3=1.0/3.0;
+        for (var i = 0; i < count; ++i) {
+            var p2=vs[i];
+            var p3 = i+1 <count ? vs[i+1] : vs[0];
+            var e1X =p2.x-p1X;
+            var e1Y =p2.y-p1Y;
+            var e2X =p3.x-p1X;
+            var e2Y =p3.y-p1Y;
+            var D  = (e1X * e2Y - e1Y * e2X);
+            var triangleArea =0.5*D;
+            area+=triangleArea;
+            c.x += triangleArea * inv3 * (p1X + p2.x + p3.x);
+            c.y += triangleArea * inv3 * (p1Y + p2.y + p3.y);
+        }
+        c.x*=1.0/area;
+        c.y*=1.0/area;
+        return c;
+    }
+
+    window.Environment = Environment;
 })(window);

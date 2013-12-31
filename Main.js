@@ -10,7 +10,8 @@ var box2d = {
    b2MassData : Box2D.Collision.Shapes.b2MassData,
    b2PolygonShape : Box2D.Collision.Shapes.b2PolygonShape,
    b2CircleShape : Box2D.Collision.Shapes.b2CircleShape,
-   b2DebugDraw : Box2D.Dynamics.b2DebugDraw
+   b2DebugDraw : Box2D.Dynamics.b2DebugDraw,
+   b2RevoluteJointDef : Box2D.Dynamics.Joints.b2RevoluteJointDef
 };
 
 var STAGE_WIDTH = 1000;
@@ -19,7 +20,10 @@ var BLOOD_VESSEL_THICKNESS = 170;
 
 var SCALE = 30;
 var canvas, stage, world;
+var debugCanvas;
 var resourcesQueue;
+var collisionDetection;
+var environment;
 
 //var backgroundLevel1;
 
@@ -35,16 +39,19 @@ var isThereMovingObject;
 
 var spawnPointY;
 
-//var ballsArray;
+var ballsArray;
+var destroyBodyList = [];
 
 function init() {
 	canvas = document.getElementById("canvas");
 	stage = new createjs.Stage(canvas);
+
+    debugCanvas = document.getElementById("debugCanvas");
 	
 	// enable touch interactions if supported on the current device:
 	createjs.Touch.enable(stage);
 	
-//ballsArray = new Array();
+    ballsArray = [];
 
 	messageField = new createjs.Text("Loading", "bold 24px Arial", "#000000");
 	messageField.maxWidth = 1000;
@@ -59,8 +66,8 @@ function init() {
 		{id:"backgroundLevel1", src:"Bilder/backgroundLevel1.png"},
 		{id:"toolbarBackgroundImage", src:"Bilder/Symbolleiste.png"},
 		{id:"neutrophilToolbar", src:"Bilder/NeutrophilSymbolleiste.png"},
-		{id:"neutrophil", src:"Bilder/Neutrophil.png"},
-		{id:"dunkelHintergrund", src:"Bilder/dunkelHintergrund.png"},
+		{id:"neutrophil", src:"Bilder/Neutrophil3.png"},
+		{id:"dunkelHintergrund", src:"Bilder/dunkelHintergrund_grun.png"},
 	];
 	
 	resourcesQueue = new createjs.LoadQueue(false);
@@ -101,12 +108,12 @@ function handleStartClick() {
 	setToolbar();
 	stage.update();
 	
-	
-	drawHills(4, 5);
+	environment = new Environment(stage);
+	environment.drawHills(4, 5);
+
+    collisionDetection = new CollisionDetection();
 	
 	canvas.onclick = handleClick;
-	
-
 }
 
 function setBackground() {
@@ -161,39 +168,13 @@ function handleClick_NeutrophilToolbarImage(event)
 	circle.alpha = 0.5;
 	stage.addChild(circle);
 
-	var holdingNeutrophil = new createjs.Bitmap(resourcesQueue.getResult("neutrophil"));
-	var bounds = holdingNeutrophil.getBounds();
-	holdingNeutrophil.regX = bounds.x / 2;
-	holdingNeutrophil.regY = bounds.y / 2;
-	
-	var moveSprite = -27;
-	holdingNeutrophil.x = event.stageX + moveSprite;
-	holdingNeutrophil.y = event.stageY + moveSprite;
-	holdingNeutrophil.moving = false;
-	
-	isThereMovingObject = true;
-	movingObject = holdingNeutrophil;
-	movingObject.addEventListener("click", function(evt) {
-		if (isThereMovingObject) {
-			removeDarkStage();
-		} else {
-			darkenStage();
-		}
-	
-		isThereMovingObject = !isThereMovingObject;
-	});
-	
-	stage.addChild(holdingNeutrophil);
-	
-
+    var whiteBloodCell = new WhiteBloodCell(stage);
+    whiteBloodCell.createCell();
 }
-
-
-	
 
 function handleClick() {	
 	var b = new Ball(10/SCALE, (spawnPointY + (Math.random() - 0.5) * BLOOD_VESSEL_THICKNESS) / SCALE);
-	//ballsArray.push(b);
+	ballsArray.push(b);
 	stage.addChild(b.view); // We add createjs object, not Ball object itself!
 	
 	setTimeout(b.applyImpulse(-(Math.random()-0.5)*150, 20), 1);
@@ -201,14 +182,15 @@ function handleClick() {
 
 function setupDebugDraw() {
     var debugDraw = new box2d.b2DebugDraw();
-    debugDraw.SetSprite(stage.canvas.getContext('2d'));
+    debugDraw.SetSprite(debugCanvas.getContext('2d'));
     debugDraw.SetDrawScale(SCALE);
     debugDraw.SetFlags(box2d.b2DebugDraw.e_shapeBit | box2d.b2DebugDraw.e_jointBit);
-    debugDraw.SetFillAlpha(0.5);
+    debugDraw.SetFillAlpha(0.7);
     world.SetDebugDraw(debugDraw);
 }
+
 function setupPhysics() {
-	var gravity = new box2d.b2Vec2(3, 0);
+	var gravity = new box2d.b2Vec2(0, 0);
 	world = new box2d.b2World(gravity, true); // Gravity defined here
 
     /*
@@ -227,30 +209,6 @@ function setupPhysics() {
 }
 
 
-function findCentroid(vs, count) {
-    var c = new box2d.b2Vec2();
-    var area=0.0;
-    var p1X=0.0;
-    var p1Y=0.0;
-    var inv3=1.0/3.0;
-    for (var i = 0; i < count; ++i) {
-        var p2=vs[i];
-        var p3 = i+1 <count ? vs[i+1] : vs[0];
-        var e1X =p2.x-p1X;
-        var e1Y =p2.y-p1Y;
-        var e2X =p3.x-p1X;
-        var e2Y =p3.y-p1Y;
-        var D  = (e1X * e2Y - e1Y * e2X);
-        var triangleArea =0.5*D;
-        area+=triangleArea;
-        c.x += triangleArea * inv3 * (p1X + p2.x + p3.x);
-        c.y += triangleArea * inv3 * (p1Y + p2.y + p3.y);
-    }
-    c.x*=1.0/area;
-    c.y*=1.0/area;
-    return c;
-}
-
 function tick(evt) {
 /*
 	for (var i = 0; i < ballsArray.length; i++) {
@@ -260,22 +218,26 @@ function tick(evt) {
 	*/
 	
 	if (isThereMovingObject) {
-		var moveSprite = -27;
-		movingObject.x = stage.mouseX + moveSprite;
-		movingObject.y = stage.mouseY + moveSprite;
-		console.log("stage  mouse X");
+		//var moveSprite = -27;
+		//movingObject.x = stage.mouseX + moveSprite;
+		//movingObject.y = stage.mouseY + moveSprite;
+        ////movingObject.setPosition(stage.mouseX + moveSprite, stage.mouseY + moveSprite);
+
 		circle.x = stage.mouseX;
 		circle.y = stage.mouseY;
-		
-		
 	}
 
 	stage.update();
 	
-	//world.DrawDebugData(); // vor wurde diese kommentiert
+	world.DrawDebugData(); // vor wurde diese kommentiert
 	
 	world.Step(1/60, 10, 10);
 	world.ClearForces();
+
+    for (var i = 0; i < destroyBodyList.length; i++) {
+        world.DestroyBody(destroyBodyList[i]);
+    }
+    destroyBodyList = [];
 }
 
 //})();

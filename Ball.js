@@ -1,5 +1,7 @@
 (function(window) {
 
+    const BOX2D_CIRCLE_SIZE = 10;
+
 	function Ball(x, y) {
 		this.view = new createjs.Bitmap(resourcesQueue.getResult("ball"));
 		this.view.regX = this.view.regY = 100;
@@ -14,26 +16,33 @@
 		bodyDef.type = box2d.b2Body.b2_dynamicBody;
 		bodyDef.position.x = x;
 		bodyDef.position.y = y;
-		fixDef.shape = new box2d.b2CircleShape(10 / SCALE);
+		fixDef.shape = new box2d.b2CircleShape(BOX2D_CIRCLE_SIZE / SCALE);
 		this.view.body = world.CreateBody(bodyDef);
 		this.view.body.CreateFixture(fixDef);
 		this.view.addEventListener("tick", tick.bind(this.view));
 	}
-	
-	//Ball.prototype.update = function() {
+
+    Ball.prototype.applyImpulse = function(degrees, power) {
+        //function applyImpulse(degrees, power) {
+        this.view.body.ApplyImpulse(new box2d.b2Vec2(Math.cos(degrees * (Math.PI / 180)) * power,
+            Math.sin(degrees * (Math.PI / 180)) * power),
+            this.view.body.GetWorldCenter());
+    }
+
+    Ball.prototype.getCircleSize = function() {
+        return BOX2D_CIRCLE_SIZE;
+    }
+
+    //Ball.prototype.update = function() {
 	function tick() {
 		this.x = this.body.GetPosition().x * SCALE;
 		this.y = this.body.GetPosition().y * SCALE;
 		this.rotation = this.body.GetAngle() * (180/Math.PI); // GetAngle is in radians, we convert to degrees (createjs uses degrees).
-	}
-	
-	Ball.prototype.applyImpulse = function(degrees, power) {
-	//function applyImpulse(degrees, power) {
-		this.view.body.ApplyImpulse(new box2d.b2Vec2(Math.cos(degrees * (Math.PI / 180)) * power,
-                                 Math.sin(degrees * (Math.PI / 180)) * power),
-                                 this.view.body.GetWorldCenter());
-	}
-	
-	window.Ball = Ball;
 
+        var force = new box2d.b2Vec2(3, 0);
+        this.body.ApplyForce(force, this.body.GetWorldCenter());
+	}
+	
+
+	window.Ball = Ball;
 })(window);
