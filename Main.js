@@ -40,7 +40,8 @@ var isThereMovingObject;
 var spawnPointY;
 
 var ballsArray;
-var destroyBodyList = [];
+var whitesArray;
+var destroyBodyList;
 
 function init() {
 	canvas = document.getElementById("canvas");
@@ -50,8 +51,10 @@ function init() {
 	
 	// enable touch interactions if supported on the current device:
 	createjs.Touch.enable(stage);
-	
+
     ballsArray = [];
+    whitesArray = [];
+    destroyBodyList = [];
 
 	messageField = new createjs.Text("Loading", "bold 24px Arial", "#000000");
 	messageField.maxWidth = 1000;
@@ -168,15 +171,17 @@ function handleClick_NeutrophilToolbarImage(event)
 	circle.alpha = 0.5;
 	stage.addChild(circle);
 
-    var whiteBloodCell = new WhiteBloodCell(stage);
+    var whiteBloodCell = new WhiteBloodCell();
     whiteBloodCell.createCell();
+    stage.addChild(whiteBloodCell.view);
+    whitesArray.push(whiteBloodCell);
 }
 
 function handleClick() {	
 	var b = new Ball(10/SCALE, (spawnPointY + (Math.random() - 0.5) * BLOOD_VESSEL_THICKNESS) / SCALE);
 	ballsArray.push(b);
 	stage.addChild(b.view); // We add createjs object, not Ball object itself!
-	
+
 	setTimeout(b.applyImpulse(-(Math.random()-0.5)*150, 20), 1);
 }
 
@@ -216,6 +221,15 @@ function tick(evt) {
 		b.update();
 	}
 	*/
+
+    /*
+    console.log("WHITES ARRAY: ");
+    for (var i = 0; i < whitesArray.length; i++) {
+        var white = whitesArray[i];
+        console.log(white.isBeingDragged);
+    }
+    */
+    //console.log("TICKKKKK");
 	
 	if (isThereMovingObject) {
 		//var moveSprite = -27;

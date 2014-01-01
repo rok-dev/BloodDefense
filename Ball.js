@@ -7,7 +7,7 @@
 		this.view.regX = this.view.regY = 100;
 		
 		this.view.scaleX = this.view.scaleY = 0.1;
-		
+
 		var fixDef = new box2d.b2FixtureDef();
 		fixDef.density = 5.0;
 		fixDef.friction = 0.5;
