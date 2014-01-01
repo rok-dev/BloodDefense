@@ -6,11 +6,14 @@
     /**
      * Checks intersection between a circle and a rectangle.
      *
-     * Source: http://stackoverflow.com/a/402010/365837
+         * Source: http://stackoverflow.com/a/402010/365837
      */
     CollisionDetection.prototype.intersectsCircleRect = function(circlePositionX, circlePositionY, circleRadius, rect) {
-        var circleDistanceX = Math.abs(circlePositionX - rect.x);
-        var circleDistanceY = Math.abs(circlePositionY - rect.y);
+        var rectCenterX = rect.x + rect.width / 2;
+        var rectCenterY = rect.y + rect.height / 2;
+
+        var circleDistanceX = Math.abs(circlePositionX - rectCenterX);
+        var circleDistanceY = Math.abs(circlePositionY - rectCenterY);
 
         if (circleDistanceX > (rect.width/2 + circleRadius)) { return false; }
         if (circleDistanceY > (rect.height/2 + circleRadius)) { return false; }

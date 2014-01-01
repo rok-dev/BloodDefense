@@ -5,8 +5,9 @@
 	function Ball(x, y) {
 		this.view = new createjs.Bitmap(resourcesQueue.getResult("ball"));
 		this.view.regX = this.view.regY = 100;
-		
 		this.view.scaleX = this.view.scaleY = 0.1;
+
+        this.view.isBeingAbsorbed = false;
 
 		var fixDef = new box2d.b2FixtureDef();
 		fixDef.density = 5.0;

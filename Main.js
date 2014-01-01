@@ -40,7 +40,11 @@ var isThereMovingObject;
 var spawnPointY;
 
 var ballsArray;
+var ballsContainer;
+
 var whitesArray;
+var whitesContainer;
+
 var destroyBodyList;
 
 function init() {
@@ -53,7 +57,11 @@ function init() {
 	createjs.Touch.enable(stage);
 
     ballsArray = [];
+    ballsContainer = new createjs.Container();
+
     whitesArray = [];
+    whitesContainer = new createjs.Container();
+
     destroyBodyList = [];
 
 	messageField = new createjs.Text("Loading", "bold 24px Arial", "#000000");
@@ -70,7 +78,7 @@ function init() {
 		{id:"toolbarBackgroundImage", src:"Bilder/Symbolleiste.png"},
 		{id:"neutrophilToolbar", src:"Bilder/NeutrophilSymbolleiste.png"},
 		{id:"neutrophil", src:"Bilder/Neutrophil3.png"},
-		{id:"dunkelHintergrund", src:"Bilder/dunkelHintergrund_grun.png"},
+		{id:"dunkelHintergrund", src:"Bilder/dunkelHintergrund.png"},
 	];
 	
 	resourcesQueue = new createjs.LoadQueue(false);
@@ -113,6 +121,9 @@ function handleStartClick() {
 	
 	environment = new Environment(stage);
 	environment.drawHills(4, 5);
+
+    stage.addChild(whitesContainer);
+    stage.addChild(ballsContainer);
 
     collisionDetection = new CollisionDetection();
 	
@@ -159,28 +170,36 @@ function setToolbar() {
 	stage.addChild(toolbar);
 }
 
+
 function handleClick_NeutrophilToolbarImage(event)
 {
 	darkenStage();
-	
-	circle = new createjs.Shape();
-	circle.graphics.beginFill(circleSelectedColor).drawCircle(0, 0, 100);
-	circle.regX = circle.regY = -5;
-	circle.x = event.stageX;
-	circle.y = event.stageY;
-	circle.alpha = 0.5;
-	stage.addChild(circle);
 
+    addCircle(event.stageX, event.stageY);
     var whiteBloodCell = new WhiteBloodCell();
     whiteBloodCell.createCell();
-    stage.addChild(whiteBloodCell.view);
+    whitesContainer.addChild(whiteBloodCell.view);
     whitesArray.push(whiteBloodCell);
+}
+
+function addCircle(x, y) {
+    circle = new createjs.Shape();
+    circle.graphics.beginFill(circleSelectedColor).drawCircle(0, 0, 100);
+    circle.regX = circle.regY = -5;
+    circle.x = x;
+    circle.y = y;
+    circle.alpha = 0.5;
+    stage.addChildAt(circle, stage.getChildIndex(whitesContainer));
+}
+
+function removeCircle() {
+    stage.removeChild(circle);
 }
 
 function handleClick() {	
 	var b = new Ball(10/SCALE, (spawnPointY + (Math.random() - 0.5) * BLOOD_VESSEL_THICKNESS) / SCALE);
 	ballsArray.push(b);
-	stage.addChild(b.view); // We add createjs object, not Ball object itself!
+	ballsContainer.addChild(b.view); // We add createjs object, not Ball object itself!
 
 	setTimeout(b.applyImpulse(-(Math.random()-0.5)*150, 20), 1);
 }

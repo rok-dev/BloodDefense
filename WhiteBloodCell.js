@@ -14,13 +14,16 @@
         this.view.regX = bounds.x / 2;
         this.view.regY = bounds.y / 2;
 
+
+
         //this.view.x = event.stageX + MOVE_SPRITE;
         //this.view.y = event.stageY + MOVE_SPRITE;
-        this.view.moving = false;
 
         isThereMovingObject = true;
+        this.view.moving = false;
         this.view.isBeingDragged = true;
-        this.view.sup = "sup"
+        this.view.absorbing = false;
+        this.view.isPositioningDisabled = false;
 
         movingObject = this.view;
         this.view.addEventListener("click", handleWhiteClick.bind(this.view));
@@ -45,21 +48,38 @@
         this.view.body.CreateFixture(fixDef);
 
         this.view.addEventListener("tick", tick.bind(this.view));
-        stage.addChild(this.view);
+        //stage.addChild(this.view);
     }
 
-    function handleWhiteClick(evt) {
-        //console.log("istheremoving: " + this.isThereMovingObject);
-        //console.log("sup: " + this.sup);
-        if (isThereMovingObject) {
-            this.isBeingDragged = false;
-            removeDarkStage();
-        } else {
-            this.isBeingDragged = true;
-            darkenStage();
-        }
+    function redFilterToogler(cellView, shouldApplyFilter) {
+        if (!cellView.isPositioningDisabled && shouldApplyFilter) {
+            var redFilter = new createjs.ColorFilter(1,0,0,0.5);
+            cellView.filters = [redFilter];
+            cellView.cache(0, 0, cellView.image.width, cellView.image.height);
+            console.log("enable")
+            cellView.isPositioningDisabled = true;
+        } else if (cellView.isPositioningDisabled && !shouldApplyFilter) {
+            cellView.filters = [];
+            cellView.uncache();
+            console.log("disable")
 
-        isThereMovingObject = !isThereMovingObject;
+            cellView.isPositioningDisabled = false;
+        }
+    }
+
+    function handleWhiteClick(event) {
+        //console.log("istheremoving: " + this.isThereMovingObject);
+        if (isThereMovingObject && !this.isPositioningDisabled) {
+            this.isBeingDragged = false;
+            isThereMovingObject = false;
+            removeDarkStage();
+            removeCircle();
+        } else if (!isThereMovingObject){
+            this.isBeingDragged = true;
+            isThereMovingObject = true;
+            darkenStage();
+            addCircle(event.stageX, event.stageY);
+        }
     }
 
     // TODO: check if not already being eaten by some other
@@ -81,6 +101,37 @@
         return [minPanth, minDist];
     }
 
+    function doesIntersectWithBloodVessel(newX, newY) {
+        var intersectsWithBloodVessel = false;
+        var bloodRectsArray = environment.getRectanglesArray();
+        for (var i = 0; i < bloodRectsArray.length; i++) {
+            var curRect = bloodRectsArray[i];
+            if (collisionDetection.intersectsCircleRect(newX, newY, BOX2D_CIRCLE_SIZE, curRect)) {
+                intersectsWithBloodVessel = true;
+            }
+        }
+        return intersectsWithBloodVessel;
+    }
+
+    /**
+     * Moves the cell around depending on mouse location.
+     */
+    function moveCellWithMouse(cellView) {
+        var newX = stage.mouseX;
+        var newY = stage.mouseY;
+        cellView.body.SetPosition(new box2d.b2Vec2(newX / SCALE, newY / SCALE), 0);
+        cellView.standingPositionX = newX;
+        cellView.standingPositionY = newY;
+
+        redFilterToogler(cellView, !canCellBePositionedHere(newX, newY));
+
+        // TODO: Check collision between other white.
+    }
+
+    function canCellBePositionedHere(newX, newY) {
+        return !doesIntersectWithBloodVessel(newX, newY);
+    }
+
     function tick() {
         //this.body.ApplyForce(- this.body.GetMass() * world.GetGravity(), this.body.GetWorldCenter());
         /*
@@ -92,21 +143,7 @@
         //console.log("dragged " + this.isBeingDragged);
 
         if (this.isBeingDragged) {
-            var newX = stage.mouseX;
-            var newY = stage.mouseY;
-            this.body.SetPosition(new box2d.b2Vec2(newX / SCALE, newY / SCALE), 0);
-            this.standingPositionX = this.body.GetPosition().x * SCALE;
-            this.standingPositionY = this.body.GetPosition().y * SCALE;
-
-            var bloodRectsArray = environment.getRectanglesArray();
-            for (var i = 0; i < bloodRectsArray.length; i++) {
-                var curRect = bloodRectsArray[i];
-                if (collisionDetection.intersectsCircleRect(newX, newY, BOX2D_CIRCLE_SIZE, curRect)) {
-                    //console.log("Collision betweeen white blood cell & blood vessel");
-                }
-            }
-
-            // TODO: Check collision between other white.
+            moveCellWithMouse(this);
         } else {
             var whiteCenterX = this.x - MOVE_SPRITE;
             var whiteCenterY = this.y - MOVE_SPRITE;
@@ -114,10 +151,13 @@
             var panthsInRange = [];
             for (var i = 0; i < ballsArray.length; i++) {
                 var panth = ballsArray[i];
-                //console.log(this.x + " " + this.y);
                 if (collisionDetection.intersectsCircleCircle(whiteCenterX, whiteCenterY, HIT_RANGE,
                                                                 panth.view.x, panth.view.y, panth.getCircleSize())) {
-                    //console.log("Collision range white & panth");
+
+                    // Skip panths which are being absorbed and don't belong to you.
+                    if (!this.absorbing && panth.view.isBeingAbsorbed) {
+                        continue;
+                    }
                     panthsInRange.push([panth, collisionDetection.distanceBetween(whiteCenterX, whiteCenterY, panth.view.x, panth.view.y)]);
                 }
             }
@@ -135,6 +175,9 @@
 
                 if (closestDist < 50) {
                     if (typeof this.joint == "undefined" || this.joint == null) {
+                        closestPanth.view.isBeingAbsorbed = true;
+                        this.absorbing = true;
+
                         //joint_def = new Box2D.Dynamics.Joints.b2DistanceJointDef();
                         var joint_def = new Box2D.Dynamics.Joints.b2DistanceJointDef();
                         joint_def.bodyA = this.body;
@@ -144,22 +187,7 @@
                         //joint_def.dampingRatio = 50;
                         joint_def.length = closestDist / SCALE;
                         this.joint = world.CreateJoint(joint_def);
-                    } else {
-
                     }
-
-                    /*
-                    if (closestDist < 5) {
-                        joint_def = new box2d.b2RevoluteJointDef();
-                        joint_def.bodyA = this.body;
-                        joint_def.bodyB = closestPanth.view.body;
-                        joint_def.localAnchorA = new box2d.b2Vec2(0, 0);
-                        joint_def.localAnchorB = new box2d.b2Vec2(0, 0);
-                        //joint_def.dampingRatio = 50;
-                        joint_def.maxForce = 5;
-                        world.CreateJoint(joint_def);
-                    }
-                    */
                 }
 
                 if (!(typeof this.joint == "undefined" || this.joint == null)) {
@@ -180,6 +208,8 @@
                             stage.removeChild(closestPanth.view);
                             var index = ballsArray.indexOf(closestPanth);
                             ballsArray.splice(index, 1);
+
+                            this.absorbing = false;
                         }
                     }
                 }
