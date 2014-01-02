@@ -1,18 +1,31 @@
 (function(window) {
 
-    const BOX2D_CIRCLE_SIZE = 10;
+    const BOX2D_CIRCLE_SIZE = 5;
 
-	function Ball(x, y) {
-		this.view = new createjs.Bitmap(resourcesQueue.getResult("ball"));
-		this.view.regX = this.view.regY = 100;
-		this.view.scaleX = this.view.scaleY = 0.1;
+    var regX = {
+        "bacteria" : 25,
+        "parasite" : 35
+    };
 
+    var regY = {
+        "bacteria" : 15,
+        "parasite" : 29
+    };
+
+	function Ball(x, y, panthogenType) {
+		this.view = new createjs.Bitmap(resourcesQueue.getResult(panthogenType));
+		this.view.regX = regX[panthogenType];
+        this.view.regY = regY[panthogenType];
+		this.view.scaleX = this.view.scaleY = 0.3;
+        this.view.alpha = 0.9;
+
+        this.view.panthogenType = panthogenType;
         this.view.isBeingAbsorbed = false;
 
 		var fixDef = new box2d.b2FixtureDef();
-		fixDef.density = 5.0;
-		fixDef.friction = 0.5;
-		fixDef.restitution = 0.8;
+		fixDef.density = 30.0;
+		fixDef.friction = 3;
+		fixDef.restitution = 0.3;
 		var bodyDef = new box2d.b2BodyDef();
 		bodyDef.type = box2d.b2Body.b2_dynamicBody;
 		bodyDef.position.x = x;

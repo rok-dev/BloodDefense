@@ -5,16 +5,19 @@
     const MOVE_SPRITE = -22;
     const BACK_TO_STANDING_POSITION_SPEED = 1;
 
-    function WhiteBloodCell() {
+    var huntsPanthogenType = {
+        "neutrophil" : "bacteria",
+        "eosinophil" : "parasite"
     }
 
-    WhiteBloodCell.prototype.createCell = function() {
-        this.view = new createjs.Bitmap(resourcesQueue.getResult("neutrophil"));
+    function WhiteBloodCell() {}
+
+    WhiteBloodCell.prototype.createCell = function(whiteBloodCellType) {
+        this.view = new createjs.Bitmap(resourcesQueue.getResult(whiteBloodCellType));
         var bounds = this.view.getBounds();
         this.view.regX = bounds.x / 2;
         this.view.regY = bounds.y / 2;
-
-
+        this.view.alpha = 0.9;
 
         //this.view.x = event.stageX + MOVE_SPRITE;
         //this.view.y = event.stageY + MOVE_SPRITE;
@@ -24,6 +27,7 @@
         this.view.isBeingDragged = true;
         this.view.absorbing = false;
         this.view.isPositioningDisabled = false;
+        this.view.whiteBloodCellType = whiteBloodCellType;
 
         movingObject = this.view;
         this.view.addEventListener("click", handleWhiteClick.bind(this.view));
@@ -56,12 +60,10 @@
             var redFilter = new createjs.ColorFilter(1,0,0,0.5);
             cellView.filters = [redFilter];
             cellView.cache(0, 0, cellView.image.width, cellView.image.height);
-            console.log("enable")
             cellView.isPositioningDisabled = true;
         } else if (cellView.isPositioningDisabled && !shouldApplyFilter) {
             cellView.filters = [];
             cellView.uncache();
-            console.log("disable")
 
             cellView.isPositioningDisabled = false;
         }
@@ -72,13 +74,13 @@
         if (isThereMovingObject && !this.isPositioningDisabled) {
             this.isBeingDragged = false;
             isThereMovingObject = false;
-            removeDarkStage();
-            removeCircle();
+
+            goOutOfPositioningMode();
         } else if (!isThereMovingObject){
             this.isBeingDragged = true;
             isThereMovingObject = true;
-            darkenStage();
-            addCircle(event.stageX, event.stageY);
+
+            goToPositioningMode();
         }
     }
 
@@ -101,7 +103,10 @@
         return [minPanth, minDist];
     }
 
-    function doesIntersectWithBloodVessel(newX, newY) {
+    function doesIntersectWithBloodVessel(cellView) {
+        var newX = cellView.body.GetPosition().x * SCALE;
+        var newY = cellView.body.GetPosition().y * SCALE;
+
         var intersectsWithBloodVessel = false;
         var bloodRectsArray = environment.getRectanglesArray();
         for (var i = 0; i < bloodRectsArray.length; i++) {
@@ -113,6 +118,22 @@
         return intersectsWithBloodVessel;
     }
 
+    function doesIntersectWithOtherCells(cellView) {
+        var intersectsWithOtherCells = false;
+        for (var i = 0; i < whitesArray.length; i++) {
+            var otherCell = whitesArray[i];
+            if (otherCell.view == cellView) continue;
+
+            if (collisionDetection.intersectsCircleCircle(cellView.x, cellView.y, BOX2D_CIRCLE_SIZE,
+                                                         otherCell.view.standingPositionX, otherCell.view.standingPositionY, BOX2D_CIRCLE_SIZE)) {
+
+                intersectsWithOtherCells = true;
+                break;
+            }
+        }
+        return intersectsWithOtherCells;
+    }
+
     /**
      * Moves the cell around depending on mouse location.
      */
@@ -120,16 +141,16 @@
         var newX = stage.mouseX;
         var newY = stage.mouseY;
         cellView.body.SetPosition(new box2d.b2Vec2(newX / SCALE, newY / SCALE), 0);
-        cellView.standingPositionX = newX;
-        cellView.standingPositionY = newY;
+        cellView.standingPositionX = newX + MOVE_SPRITE;
+        cellView.standingPositionY = newY + MOVE_SPRITE;
 
-        redFilterToogler(cellView, !canCellBePositionedHere(newX, newY));
+        redFilterToogler(cellView, !canCellBePositionedHere(cellView));
 
         // TODO: Check collision between other white.
     }
 
-    function canCellBePositionedHere(newX, newY) {
-        return !doesIntersectWithBloodVessel(newX, newY);
+    function canCellBePositionedHere(cellView) {
+        return !doesIntersectWithBloodVessel(cellView) && !doesIntersectWithOtherCells(cellView);
     }
 
     function tick() {
@@ -153,6 +174,10 @@
                 var panth = ballsArray[i];
                 if (collisionDetection.intersectsCircleCircle(whiteCenterX, whiteCenterY, HIT_RANGE,
                                                                 panth.view.x, panth.view.y, panth.getCircleSize())) {
+                    // Skip panths which are not of the type this white blood cell hunts.
+                    if (panth.view.panthogenType != huntsPanthogenType[this.whiteBloodCellType]) {
+                        continue;
+                    }
 
                     // Skip panths which are being absorbed and don't belong to you.
                     if (!this.absorbing && panth.view.isBeingAbsorbed) {
@@ -214,7 +239,7 @@
                     }
                 }
             } else {
-                var direction = new box2d.b2Vec2(((this.standingPositionX + MOVE_SPRITE) - this.x), ((this.standingPositionY + MOVE_SPRITE) - this.y));
+                var direction = new box2d.b2Vec2((this.standingPositionX - this.x), (this.standingPositionY - this.y));
                 if (direction.Length() > 0.5) {
                     direction.Normalize();
                 }

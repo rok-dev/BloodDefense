@@ -73,12 +73,17 @@ function init() {
 	stage.update();
 	
 	var manifest = [
-		{id:"ball", src:"ball.png"},
 		{id:"backgroundLevel1", src:"Bilder/backgroundLevel1.png"},
 		{id:"toolbarBackgroundImage", src:"Bilder/Symbolleiste.png"},
+        {id:"dunkelHintergrund", src:"Bilder/dunkelHintergrund.png"},
+
+        {id:"bacteria", src:"Bilder/bacteria.png"},
+        {id:"parasite", src:"Bilder/parasite.png"},
+
 		{id:"neutrophilToolbar", src:"Bilder/NeutrophilSymbolleiste.png"},
 		{id:"neutrophil", src:"Bilder/Neutrophil3.png"},
-		{id:"dunkelHintergrund", src:"Bilder/dunkelHintergrund.png"},
+        {id:"eosinophil", src:"Bilder/Eosinophil.png"},
+
 	];
 	
 	resourcesQueue = new createjs.LoadQueue(false);
@@ -120,7 +125,7 @@ function handleStartClick() {
 	stage.update();
 	
 	environment = new Environment(stage);
-	environment.drawHills(4, 5);
+	environment.drawHills(3, 5);
 
     stage.addChild(whitesContainer);
     stage.addChild(ballsContainer);
@@ -139,19 +144,6 @@ function setBackground() {
 	stage.addChild(backgroundImage);
 }
 
-function darkenStage() {
-	darkStage.regX = darkStage.regY = 0;
-	darkStage.x = 0;
-	darkStage.y = 0;
-	darkStage.alpha = 0.5;
-	
-	stage.addChildAt(darkStage, stage.getChildIndex(backgroundImage) + 1);
-}
-
-function removeDarkStage() {
-	stage.removeChild(darkStage);
-}
-
 function setToolbar() {
 	toolbar = new createjs.Container();
 	toolbar.x = 0;
@@ -166,28 +158,38 @@ function setToolbar() {
 	neutrophilToolbarImage.y = 20;
 	neutrophilToolbarImage.addEventListener("click", handleClick_NeutrophilToolbarImage);
 	toolbar.addChild(neutrophilToolbarImage);
-	
+
+    var eosinophilToolbarImage = new createjs.Bitmap(resourcesQueue.getResult("neutrophilToolbar"));
+    eosinophilToolbarImage.x = 80;
+    eosinophilToolbarImage.y = 20;
+    eosinophilToolbarImage.addEventListener("click", handleClick_EosinophilToolbarImage);
+    toolbar.addChild(eosinophilToolbarImage);
+
 	stage.addChild(toolbar);
 }
 
 
-function handleClick_NeutrophilToolbarImage(event)
-{
-	darkenStage();
-
-    addCircle(event.stageX, event.stageY);
-    var whiteBloodCell = new WhiteBloodCell();
-    whiteBloodCell.createCell();
-    whitesContainer.addChild(whiteBloodCell.view);
-    whitesArray.push(whiteBloodCell);
+function handleClick_NeutrophilToolbarImage(event) {
+    createWhiteBloodCellAndGoToPositiongMode("neutrophil");
 }
 
-function addCircle(x, y) {
+function handleClick_EosinophilToolbarImage(event) {
+    createWhiteBloodCellAndGoToPositiongMode("eosinophil");
+}
+
+function createWhiteBloodCellAndGoToPositiongMode(whiteBloodCellType) {
+    var whiteBloodCell = new WhiteBloodCell();
+    whiteBloodCell.createCell(whiteBloodCellType);
+    whitesContainer.addChild(whiteBloodCell.view);
+    whitesArray.push(whiteBloodCell);
+
+    goToPositioningMode();
+}
+
+function addCircle() {
     circle = new createjs.Shape();
     circle.graphics.beginFill(circleSelectedColor).drawCircle(0, 0, 100);
     circle.regX = circle.regY = -5;
-    circle.x = x;
-    circle.y = y;
     circle.alpha = 0.5;
     stage.addChildAt(circle, stage.getChildIndex(whitesContainer));
 }
@@ -196,8 +198,41 @@ function removeCircle() {
     stage.removeChild(circle);
 }
 
-function handleClick() {	
-	var b = new Ball(10/SCALE, (spawnPointY + (Math.random() - 0.5) * BLOOD_VESSEL_THICKNESS) / SCALE);
+function darkenStage() {
+    darkStage.regX = darkStage.regY = 0;
+    darkStage.x = 0;
+    darkStage.y = 0;
+    darkStage.alpha = 0.5;
+
+    stage.addChildAt(darkStage, stage.getChildIndex(backgroundImage) + 1);
+}
+
+function removeDarkStage() {
+    stage.removeChild(darkStage);
+}
+
+function goToPositioningMode() {
+    darkenStage();
+    addCircle();
+}
+
+function goOutOfPositioningMode() {
+    removeDarkStage();
+    removeCircle();
+}
+
+function handleClick() {
+    var pathogenType;
+    if (Math.random() > 0.5) {
+        pathogenType = "bacteria";
+    } else {
+        pathogenType = "parasite";
+    }
+
+    var posX = 10/SCALE;
+    var posY = (spawnPointY + (Math.random() - 0.5) * BLOOD_VESSEL_THICKNESS) / SCALE;
+
+	var b = new Ball(posX, posY, pathogenType);
 	ballsArray.push(b);
 	ballsContainer.addChild(b.view); // We add createjs object, not Ball object itself!
 
