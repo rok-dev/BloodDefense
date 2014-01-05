@@ -7,7 +7,8 @@
 
     var huntsPanthogenType = {
         "neutrophil" : "bacteria",
-        "eosinophil" : "parasite"
+        "eosinophil" : "parasite",
+        "lymphocyte" : "virusInfectedCell"
     }
 
     function WhiteBloodCell() {}
@@ -70,21 +71,14 @@
     }
 
     function handleWhiteClick(event) {
-        //console.log("istheremoving: " + this.isThereMovingObject);
         if (isThereMovingObject && !this.isPositioningDisabled) {
             this.isBeingDragged = false;
             isThereMovingObject = false;
 
             goOutOfPositioningMode();
-        } else if (!isThereMovingObject){
-            this.isBeingDragged = true;
-            isThereMovingObject = true;
-
-            goToPositioningMode();
         }
     }
 
-    // TODO: check if not already being eaten by some other
     function findClosestPanth(panthsInRange) {
         var minPanth = panthsInRange[0][0];
         var minDist = panthsInRange[0][1];
@@ -154,14 +148,9 @@
     }
 
     function tick() {
-        //this.body.ApplyForce(- this.body.GetMass() * world.GetGravity(), this.body.GetWorldCenter());
-        /*
-        var newX = stage.mouseX;
-        var newY = stage.mouseY;
-        this.body.SetPosition(new box2d.b2Vec2(newX / SCALE, newY / SCALE), 0);
-        return;
-        */
-        //console.log("dragged " + this.isBeingDragged);
+        if (gameState != gameStateEnum.PLAYING) {
+            return;
+        }
 
         if (this.isBeingDragged) {
             moveCellWithMouse(this);
@@ -183,6 +172,13 @@
                     if (!this.absorbing && panth.view.isBeingAbsorbed) {
                         continue;
                     }
+
+                    // Only panths inside of the stage are in range.
+                    if (panth.view.x < 0 || panth.view.y < 0
+                        || panth.view.x > STAGE_WIDTH || panth.view.y > STAGE_HEIGHT) {
+                        continue;
+                    }
+
                     panthsInRange.push([panth, collisionDetection.distanceBetween(whiteCenterX, whiteCenterY, panth.view.x, panth.view.y)]);
                 }
             }
@@ -229,10 +225,8 @@
                         if (closestPanth.view.alpha < 0) {
 
                             this.joint = null;
-                            destroyBodyList.push(closestPanth.view.body);
-                            stage.removeChild(closestPanth.view);
-                            var index = ballsArray.indexOf(closestPanth);
-                            ballsArray.splice(index, 1);
+
+                            removePanthCompletly(closestPanth.view);
 
                             this.absorbing = false;
                         }
