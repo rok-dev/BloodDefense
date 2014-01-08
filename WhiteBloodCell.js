@@ -76,6 +76,12 @@
             isThereMovingObject = false;
 
             goOutOfPositioningMode();
+
+            createjs.Sound.play("click");
+        } else if (this.isPositioningDisabled) {
+            createjs.Sound.play("error", {volume:0.3});
+
+            addWarningText("You can not place the white blood cell here.");
         }
     }
 
@@ -128,6 +134,10 @@
         return intersectsWithOtherCells;
     }
 
+    function isTooLow(cellView) {
+        return cellView.y > STAGE_HEIGHT - 120;
+    }
+
     /**
      * Moves the cell around depending on mouse location.
      */
@@ -144,7 +154,7 @@
     }
 
     function canCellBePositionedHere(cellView) {
-        return !doesIntersectWithBloodVessel(cellView) && !doesIntersectWithOtherCells(cellView);
+        return !doesIntersectWithBloodVessel(cellView) && !doesIntersectWithOtherCells(cellView) && !isTooLow(cellView);
     }
 
     function tick() {

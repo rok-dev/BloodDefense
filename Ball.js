@@ -68,6 +68,19 @@
                 energy += ADD_ENERGY_ON_RED_FINISH;
             } else {
                 life -= REMOVE_LIFE_ON_PANTH_FINISH;
+
+                if (!wasFirstLifeLostAlready) {
+
+                    dialogTextArray = [
+                        "Watch out! You lost " + REMOVE_LIFE_ON_PANTH_FINISH + " health" +
+                            "\npoint because an invader managed" +
+                            "\nto get past your defenses." +
+                            "\n\nTry placing white blood cells" +
+                            "\nstrategically.",];
+                    addDialog();
+
+                    wasFirstLifeLostAlready = true;
+                }
             }
 
             removePanthCompletly(this);

@@ -26,10 +26,10 @@ const STARTING_LIFE = 10;
 const REMOVE_LIFE_ON_PANTH_FINISH = 1;
 
 const STARTING_ENERGY = 200;
-const ADD_ENERGY_ON_RED_FINISH = 10;
+const ADD_ENERGY_ON_RED_FINISH = 5;
 const WHITE_ENERGY_CREATION_COST = 100;
 
-const END_GAME_ENERGY_NEEDED = 1500;
+const END_GAME_ENERGY_NEEDED = 600;
 
 var canvas, stage, world;
 var debugCanvas;
@@ -79,11 +79,12 @@ var energyTextField;
 var life;
 var lifeTextField;
 
+var wasFirstLifeLostAlready;
+
 /**
  * TODO:
  *       - fine tune energy/health cifre
  *       - fine tune tick cifre
- *       - glasba
  */
 function init() {
     gameState = gameStateEnum.INITIAL;
@@ -98,7 +99,7 @@ function init() {
 
 
 
-	messageField = new createjs.Text("Loading", "bold 24px Arial", "#000000");
+	messageField = new createjs.Text("LOADING...", "bold 24px Arial", "#000000");
 	messageField.maxWidth = 1000;
 	messageField.textAlign = "center";
 	messageField.x = canvas.width / 2;
@@ -111,6 +112,9 @@ function init() {
         {id:"button", src:"Bilder/button.png"},
         {id:"banner", src:"Bilder/banner1.png"},
         {id:"businessWomanStart", src:"Bilder/businessWoman2.png"},
+        {id:"neutrophil3D", src:"Bilder/neutrophil3D.png"},
+        {id:"eosinophil3D", src:"Bilder/eosinophil3D.png"},
+        {id:"virus3D", src:"Bilder/virus3D.png"},
 
 		{id:"backgroundLevel1", src:"Bilder/backgroundLevel1.png"},
         {id:"backgroundLevel2", src:"Bilder/backgroundLevel2.png"},
@@ -133,7 +137,12 @@ function init() {
 
 		{id:"neutrophil", src:"Bilder/Neutrophil3.png"},
         {id:"eosinophil", src:"Bilder/Eosinophil2.png"},
-        {id:"lymphocyte", src:"Bilder/Lymphocyte2.png"}
+        {id:"lymphocyte", src:"Bilder/Lymphocyte2.png"},
+
+        // SOUNDS
+        {id:"backgroundSound", src:"Sounds/BamaCountry.ogg"},
+        {id:"click", src:"Sounds/click.ogg"},
+        {id:"error", src:"Sounds/error.ogg"}
 
 	];
 	
@@ -168,21 +177,42 @@ function setupStartScreen() {
     startBackgroundImage.alpha = 0.5;
     stage.addChild(startBackgroundImage);
 
+    /*
+    var businessWoman = new createjs.Bitmap(resourcesQueue.getResult("businessWomanStart"));
+    businessWoman.x = 800;
+    businessWoman.y = 200;
+    stage.addChild(businessWoman);
+*/
+
+
+    var virus3D = new createjs.Bitmap(resourcesQueue.getResult("virus3D"));
+    virus3D.x = 800;
+    virus3D.y = 520;
+    virus3D.scaleX = virus3D.scaleY = 0.4;
+    stage.addChild(virus3D);
+
+    var neutrophil3D = new createjs.Bitmap(resourcesQueue.getResult("neutrophil3D"));
+    neutrophil3D.x = 180;
+    neutrophil3D.y = 205;
+    stage.addChild(neutrophil3D);
+
+    var eosinophil3D = new createjs.Bitmap(resourcesQueue.getResult("eosinophil3D"));
+    eosinophil3D.x = 520;
+    eosinophil3D.y = 190;
+    stage.addChild(eosinophil3D);
+
     var banner = new createjs.Bitmap(resourcesQueue.getResult("banner"));
     banner.x = 120;
     banner.y = 80;
     stage.addChild(banner);
 
-    var businessWoman = new createjs.Bitmap(resourcesQueue.getResult("businessWomanStart"));
-    businessWoman.x = 800;
-    businessWoman.y = 200;
-    businessWoman.alpha = 1;
-    stage.addChild(businessWoman);
-
-    createButton(180, 430, "START GAME", handleStartClick);
-    createButton(180, 500, "CREDITS", setupCreditsScreen);
+    createButton(180, 500, "START GAME", handleStartClick);
+    createButton(180, 570, "CREDITS", setupCreditsScreen);
 
     stage.update();
+
+    createjs.Sound.stop();
+    createjs.Sound.play("backgroundSound", {loop:-1});
 }
 
 function setupCreditsScreen() {
@@ -196,20 +226,28 @@ function setupCreditsScreen() {
 
     var credits = "Author (programming, some images):" +
         "\nRok Povšič - rok.povsic@gmail.com" +
-        "\n\nJavaScript framework:" +
+        "\n\nFrameworks:" +
         "\nCreateJS - www.createjs.com" +
-        "\n\nSome images:" +
-        "\nOpenGameArt - www.opengameart.org"
+        "\nBox2Dweb - code.google.com/p/box2dweb/" +
+        "\n\nImages:" +
+        "\nOpenGameArt - www.opengameart.org" +
+        "\nWikipedia - en.wikipedia.org/wiki/White_blood_cell" +
+        "\nGroovelock - http://www.flickr.com/photos/groovelock/" +
+        "\n\nMusic:" +
+        "\nBama Country Kevin MacLeod - www.incompetech.com" +
+        "\nErokia, RADIY - www.freesound.org" +
+        "\n\nThis is open source software! Find source at:" +
+        "\nwww.github.com/rok-dev/BloodDefense";
 
     var txtCredits = new createjs.Text(credits, "bold 30px Monotype Corsiva", "#111111");
     txtCredits.maxWidth = 1000;
     txtCredits.textAlign = "center";
     txtCredits.x = STAGE_WIDTH / 2;
-    txtCredits.y = 200;
+    txtCredits.y = 50;
     txtCredits.alpha = 0.8;
     stage.addChild(txtCredits);
 
-    createButton(180, 530, "RETURN TO THE MAIN SCREEN", handleReturnToMainScreen);
+    createButton(180, 630, "RETURN TO THE MAIN SCREEN", handleReturnToMainScreen);
 
     stage.update();
 }
@@ -296,6 +334,8 @@ function newGameInitialization() {
 
     youtubeIcon = null;
 
+    wasFirstLifeLostAlready = false;
+
     stage.removeAllChildren();
 
     setBackground();
@@ -373,19 +413,23 @@ function setToolbar() {
 	neutrophilToolbarImage.addEventListener("click", handleClick_NeutrophilToolbarImage);
 	toolbar.addChild(neutrophilToolbarImage);
 
+	stage.addChild(toolbar);
+}
+
+function addEosinophilToToolbar() {
     var eosinophilToolbarImage = new createjs.Bitmap(resourcesQueue.getResult("toolbarEosinophil"));
     eosinophilToolbarImage.x = 100;
     eosinophilToolbarImage.y = 5;
     eosinophilToolbarImage.addEventListener("click", handleClick_EosinophilToolbarImage);
     toolbar.addChild(eosinophilToolbarImage);
+}
 
+function addLymphocyteToToolbar() {
     var lymphocyteToolbarImage = new createjs.Bitmap(resourcesQueue.getResult("toolbarLymphocyte"));
     lymphocyteToolbarImage.x = 180;
     lymphocyteToolbarImage.y = 5;
     lymphocyteToolbarImage.addEventListener("click", handleClick_LymphocyteToolbarImage);
     toolbar.addChild(lymphocyteToolbarImage);
-
-	stage.addChild(toolbar);
 }
 
 function addDialog() {
@@ -433,31 +477,38 @@ function handleClick_LymphocyteToolbarImage(event) {
 }
 
 function createWhiteBloodCellAndGoToPositiongMode(whiteBloodCellType) {
-    if (energy >= WHITE_ENERGY_CREATION_COST) {
-        energy -= WHITE_ENERGY_CREATION_COST;
-    } else {
-        var notEnoughEnergy = new createjs.Text("You need at least " + WHITE_ENERGY_CREATION_COST + " energy to create a white blood cell.", "bold 20px Arial", "#ffffff");
-        notEnoughEnergy.maxWidth = 1000;
-        notEnoughEnergy.x = 270;
-        notEnoughEnergy.y = 650;
-        notEnoughEnergy.addEventListener("tick", function(event) {
-            notEnoughEnergy.alpha -= 0.01;
-            if (notEnoughEnergy.alpha <= 0) {
-                stage.removeChild(notEnoughEnergy);
-            }
-        })
-        stage.addChild(notEnoughEnergy);
-        return;
-    }
-
     if (gameState != gameStateEnum.PLAYING) return;
 
-    var whiteBloodCell = new WhiteBloodCell();
-    whiteBloodCell.createCell(whiteBloodCellType);
-    whitesContainer.addChild(whiteBloodCell.view);
-    whitesArray.push(whiteBloodCell);
+    if (energy >= WHITE_ENERGY_CREATION_COST) {
+        energy -= WHITE_ENERGY_CREATION_COST;
 
-    goToPositioningMode();
+        createjs.Sound.play("click");
+
+        var whiteBloodCell = new WhiteBloodCell();
+        whiteBloodCell.createCell(whiteBloodCellType);
+        whitesContainer.addChild(whiteBloodCell.view);
+        whitesArray.push(whiteBloodCell);
+
+        goToPositioningMode();
+    } else {
+        createjs.Sound.play("error", {volume:0.3});
+
+        addWarningText("You need at least " + WHITE_ENERGY_CREATION_COST + " energy to create a white blood cell.");
+    }
+}
+
+function addWarningText(text) {
+    var textLabel = new createjs.Text(text, "bold 20px Arial", "#ffffff");
+    textLabel.maxWidth = 1000;
+    textLabel.x = 270;
+    textLabel.y = 650;
+    textLabel.addEventListener("tick", function(event) {
+        textLabel.alpha -= 0.01;
+        if (textLabel.alpha <= 0) {
+            stage.removeChild(textLabel);
+        }
+    })
+    stage.addChild(textLabel);
 }
 
 function addCircle() {
@@ -497,6 +548,8 @@ function goOutOfPositioningMode() {
 
 function handleDialogClick() {
     if (isDialogDisplayed) {
+        createjs.Sound.play("click");
+
         if (dialogTextCurrentIndex < dialogTextArray.length) {
             dialogContainer.removeChildAt(1);
 
@@ -598,7 +651,7 @@ function tick(evt) {
         /**
          * MAIN STORY
          */
-        console.log(playingTickCounter);
+        //console.log(playingTickCounter);
 
         if (playingTickCounter == 0) {
             // TODO: remove when finished
@@ -609,7 +662,7 @@ function tick(evt) {
             dialogTextArray = [
                 "Hey there!" +
                     "\nWelcome to Blood Defense, a game" +
-                    "\nwhich makes learning about human" +
+                    "\nthat makes learning about human" +
                     "\nimmune system fun!" +
                     "\n\nClick on me or the bubble to " +
                     "\ncontinue.",
@@ -630,7 +683,7 @@ function tick(evt) {
                     "\nhemoglobin releases the oxygen " +
                     "\nto the cells." +
                     "\n\nWatch as red blood cells move" +
-                    "\n  through the blood vessel."];
+                    "\nthrough the blood vessel."];
             addDialog();
         } else if (playingTickCounter == 500) {
             dialogTextArray = [
@@ -639,21 +692,23 @@ function tick(evt) {
                     "\nbody are white blood cells. They" +
                     "\nare your body's defenders against" +
                     "\nbacteria and other invadors.",
+                "These invadors are always trying" +
+                    "\nto enter your body and some" +
+                    "\nare able to cause disease." +
+                    "\n\nThe little blue things you will see" +
+                    "\ncoming through the blood vessel" +
+                    "\nare bacteria. ",
                 ["Do you see the icon where arrow" +
                     "\npoints to? This is a white blood" +
                     "\ncell called neutrophil. " +
-                    "\n\nClick on it once to create it and " +
-                    "\nagain to place it. Put it" +
-                    "\nsomewhere along the blood vessel.", 0, 480],
-                "The little blue things you will see" +
-                    "\ncoming through the blood vessel" +
-                    "\nare bacteria. " +
-                    "\n\nPlace two neutrophils and " +
-                    "\nwatch how they attack the incoming" +
-                    "\nbacteria."];
+                    "\n\nAfter you close this dialog, click on" +
+                    "\nit once to create and again to place" +
+                    "\nthe neutrophil. You can place it" +
+                    "\nanywhere outside of the" +
+                    "\nblood vessel.", 0, 480]];
             addDialog();
 
-            panthProbabilitiesArray = {bacteria: 0.2, parasite: 0.0, virusInfectedCell: 0.0};
+            panthProbabilitiesArray = {bacteria: 0.15, parasite: 0.0, virusInfectedCell: 0.0};
         } else if (playingTickCounter == 2000) {
             dialogTextArray = [
                 "Neutrophils are the most common" +
@@ -691,36 +746,40 @@ function tick(evt) {
             var additionalEnergy = 200;
             energy += additionalEnergy;
 
+            addEosinophilToToolbar();
+
             dialogTextArray = [
                 "Good job coming this far! I just" +
-                    "\ngave you " + additionalEnergy + "." +
+                    "\ngave you " + additionalEnergy + " additional energy." +
                     "\n\nLet's get on with the show!",
                 "Eosinophils are another type" +
                     "\nof white blood cells. They protect" +
                     "\nyou from multicellular parasites." +
                     "\n",
                 ["This is eosinophil. Place it" +
-                    "\nalong the blood vessel to intercept" +
-                    "\nthe incoming parasites." +
+                    "\noutside of the blood vessel" +
+                    "\nto intercept the incoming parasites." +
                     "\n\nIn this game, parasites are painted " +
                     "\nwith violet color.", 80, 480]];
             addDialog();
 
             panthProbabilitiesArray = {bacteria: 0.1, parasite: 0.3, virusInfectedCell: 0.0};
-        } else if (playingTickCounter == 8000) {
+        } else if (playingTickCounter == 7000) {
             dialogTextArray = [
                 "Click on the YouTube icon below to" +
                     "\nsee an actual eosinophil."];
             addDialog();
 
             addYoutubeIcon("http://www.youtube.com/watch?v=IQaoPW9_Tyc");
-        } else if (playingTickCounter == 11000) {
+        } else if (playingTickCounter == 8000) {
             var additionalEnergy = 300;
             energy += additionalEnergy;
 
+            addLymphocyteToToolbar();
+
             dialogTextArray = [
                 "Again, good job coming this far." +
-                    "\nI gave you " + additionalEnergy + "additional" +
+                    "\nI gave you " + additionalEnergy + " additional" +
                     "\nenergy.",
                 "The last type of white blood cells" +
                     "\nwe will meet in this game are" +
@@ -734,7 +793,7 @@ function tick(evt) {
                     "\nas they allow for much faster" +
                     "\nimmune reaction.",
                 ["This is a natural killer cell. Place" +
-                    "\nit along the blood vessel to" +
+                    "\nit outside of the blood vessel to" +
                     "\nintercept the incoming virus infected" +
                     "\ncells." +
                     "\n\nIn this game, these virus infected" +
@@ -742,7 +801,7 @@ function tick(evt) {
             addDialog();
 
             panthProbabilitiesArray = {bacteria: 0.1, parasite: 0.3, virusInfectedCell: 0.5};
-        } else if (playingTickCounter == 13000) {
+        } else if (playingTickCounter == 10000) {
             dialogTextArray = [
                 "Click the YouTube icon" +
                     "\nbellow to watch an animation" +
@@ -751,14 +810,37 @@ function tick(evt) {
             addDialog();
 
             addYoutubeIcon("http://www.youtube.com/watch?v=HNP1EAYLhOs");
-        } else if (playingTickCounter == 15000) {
+        } else if (playingTickCounter == 11000) {
             dialogTextArray = [
-                "You are doing pretty good!" +
+                "You are doing pretty well!" +
+                    "\n\nTo recap: white blood cells" +
+                    "\nare crucial in protecting human body" +
+                    "\nagainst microscopic attackers.",
+                "In this game we have met three" +
+                    "\ntypes of white blood cells:" +
+                    "\nneutrophils, eosinphils and" +
+                    "\nnatural killer cells." +
+                    "\n\nThey all perform different" +
+                    "\nfunction in the body.",
+                "Neutrophils kill bacteria and" +
+                    "\nfungi, eosinophils protect" +
+                    "\nyou from large parasites and" +
+                    "\nnatural killer cells hunt down" +
+                    "\nvirus infected cells.",
+                "Other two types of white blood" +
+                    "\ncells are basophils which release" +
+                    "\nhistamine for inflammatory responses" +
+                    "\nand monocytes which migrate to other" +
+                    "\ntissues and differentiate into tissue" +
+                    "\nresident macrophages.",
+                "You're of your own now." +
                     "\n\nIn order to win in this game," +
-                    "\nyou have to increase your" +
-                    "\nenergy up to " + END_GAME_ENERGY_NEEDED + "." +
+                    "\nyou have to increase your energy" +
+                    "\nup to " + END_GAME_ENERGY_NEEDED + "." +
                     "\n\nGood luck!"];
             addDialog();
+
+            panthProbabilitiesArray = {bacteria: 0.2, parasite: 0.4, virusInfectedCell: 0.6};
         }
 
         playingTickCounter++;
